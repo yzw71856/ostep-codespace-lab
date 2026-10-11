@@ -22,7 +22,11 @@ CPU 利用率：100%
 CPU 全程都在工作，利用率 100%。
 
 - Verified result / 验证结果:
+Total Time 10, CPU 100%, IO 0%.
+
+
 - Analysis / 分析:
+预测和实际完全一致。两个进程都只有 CPU 指令，系统在进程结束后切换，<br/>所以 PID 0 先跑完 5 tick，PID 1 再跑完 5 tick。CPU 全程忙碌，利用率 100%。
 
 ## Q2
 - Prediction / 预测:
@@ -53,7 +57,15 @@ PID 0 结束后切换到 PID 1，PID 1 发起 I/O（tick 5 RUN:io 占用 1 CPU t
 最后用 1 tick（tick 11）处理 I/O 完成。
 
 - Verified result / 验证结果:
+Total Time 11, CPU 54.55%, IO 45.45%.
+
+
 - Analysis / 分析:
+预测的状态表完全正确。IO 利用率我之前预测 54.55%，实际 45.45%。
+差异原因：模拟器只统计 BLOCKED 的 5 tick 为 I/O Busy，
+不包括 RUN:io 和 RUN:io_done（它们算 CPU Busy）。
+所以 IO Busy = 5/11 = 45.45%。
+
 
 ## Q3
 - Prediction / 预测:
@@ -82,7 +94,12 @@ tick 7（带 *）PID 0 用 1 tick 处理 I/O 完成，然后结束。
 
 
 - Verified result / 验证结果:
+otal Time 7, CPU 85.71%, IO 71.43%.
+
+
 - Analysis / 分析:
+预测的状态表完全正确。IO 利用率我之前预测 85.71%，实际 71.43%。
+差异原因同上：I/O Busy 只算 BLOCKED 期间的 5 tick，5/7 = 71.43%。
 
 ## Q4
 - Prediction / 预测:
@@ -120,7 +137,12 @@ tick 7 PID 0 处理完 I/O 完成，tick 8 才正式 DONE。
 
 
 - Verified result / 验证结果:
+Total Time 11, CPU 54.55%, IO 45.45%.
+
+
 - Analysis / 分析:
+预测和实际一致。SWITCH_ON_END 让系统等 PID 0 完全结束才切换，
+CPU 在 PID 0 阻塞期间（tick 2-6）空闲。IO Busy 同样只算 BLOCKED 的 5 tick。
 
 ## Q5
 - Prediction / 预测:
@@ -152,7 +174,13 @@ tick 7（带 *）PID 0 完成 I/O 处理，进程结束。
 
 
 - Verified result / 验证结果:
+Total Time 7, CPU 85.71%, IO 71.43%.
+
+
 - Analysis / 分析:
+预测和实际一致。SWITCH_ON_IO 是默认行为（Q3 和 Q5 结果相同），
+CPU 在 PID 0 等待时切换给 PID 1。IO Busy 5/7 = 71.43%。
+
 
 ## Q6
 - Prediction / 预测:
@@ -222,7 +250,16 @@ IO_RUN_LATER 无影响。
 总时间 31。CPU 忙碌 17 tick，利用率 54.84%
 I/O 设备在 tick 1-7、18-24、25-31 工作，利用率 67.74%。
 - Verified result / 验证结果:
+Total Time 31, CPU 67.74%, IO 48.39%.
+
+
 - Analysis / 分析:
+总时间 31 和预测一致，但 CPU Busy 实际为 21 tick（67.74%），
+比我预测的 17 tick 多了 4 tick。差异原因：tick 7 的 `*` 行实际上 CPU 仍在工作
+处理 PID 0 的 io_done 或其他进程），我在手动推理时漏算了。
+IO Busy 15 tick（48.39%）也比我预测的 21 tick 少，
+因为 I/O Busy 只算 BLOCKED 的 5 tick，不包括 RUN:io 和 RUN:io_done。
+
 
 ## Q7
 - Prediction / 预测:
@@ -272,7 +309,18 @@ CPU 和 I/O 利用率都提升到 87.5%。
 
 
 - Verified result / 验证结果:
+Total Time 21, CPU 100%, IO 71.43%.
+
+
 - Analysis / 分析:
+IO_RUN_IMMEDIATE 让 PID 0 的 I/O 完成后立即恢复，3 组 I/O 几乎无缝衔接。
+CPU 在 PID 0 阻塞等待 I/O 时切给 PID 1、2、3，因此 CPU 利用率达到 100%。
+IO Busy 15/21 = 71.43%（只算 BLOCKED 的 tick，共 15 tick）。
+我预测的总时间是 24，实际是 21，差了 3 tick。
+原因：IO_RUN_IMMEDIATE 下 PID 0 恢复得非常快，
+PID 1、2、3 分别在 PID 0 的 3 次 BLOCKED 期间跑完 5 tick CPU，
+完全"填满"了等待时间，因此没有额外的 CPU 空闲。
+
 
 ## Q8
 
@@ -304,8 +352,25 @@ CPU 和 I/O 利用率都提升到 87.5%。
 
 
 - Verified result / 验证结果:
-（第 2 次 push 时补充）
+种子 1 默认：Total Time 15, CPU 53.33%, IO 66.67%
+种子 1 IMMEDIATE：Total Time 15, CPU 53.33%, IO 66.67%
+种子 1 SWITCH_ON_END：Total Time 18, CPU 50.00%, IO 55.56%
+种子 2 默认：Total Time 16, CPU 62.50%, IO 87.50%
+种子 2 IMMEDIATE：Total Time 16, CPU 62.50%, IO 87.50%
+种子 2 SWITCH_ON_END：Total Time 30, CPU 33.33%, IO 66.67%
+种子 3 默认：Total Time 18, CPU 50.00%, IO 61.11%
+种子 3 IMMEDIATE：Total Time 17, CPU 52.94%, IO 64.71%
+种子 3 SWITCH_ON_END：Total Time 24, CPU 37.50%, IO 62.50%
+
 
 - Analysis / 分析:
-（第 2 次 push 时补充）
+种子决定每条指令是 CPU 还是 I/O，因此每个种子的指令序列都不同。
+三种调度策略的对比：
+- 默认设置（SWITCH_ON_IO + IO_RUN_LATER）：I/O 完成后进程排队等
+其他进程跑完，I/O 设备可能空闲，总时间中等。
+- IO_RUN_IMMEDIATE：I/O 完成后立即恢复，减少等待时间，总时间通常最短。
+种子 3 中默认 18 → IMMEDIATE 17（快 1 tick）。
+- SWITCH_ON_END：CPU 在 I/O 等待期间空闲，总时间最长。
+种子 2 中默认 16 → SWITCH_ON_END 30（慢了近一倍！）。
+整体来看，SWITCH_ON_END 的效果最差，IO_RUN_IMMEDIATE 的效果最好。
 
